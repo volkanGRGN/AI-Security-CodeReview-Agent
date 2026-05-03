@@ -69,6 +69,10 @@ python main.py /path/to/repo --severity HIGH
 
 The project includes `.claude/commands/security-review.md`, a slash-command workflow for turning scanner results into a deeper security review with exploitability analysis, false-positive triage, and prioritized remediation.
 
+## Skill Usage
+
+This repository also includes `SKILL.md`, so it can be used as an installable Codex/Claude-style skill folder. The skill tells an agent how to run the scanner, read `.security_findings.json`, validate severe findings, and produce remediation guidance.
+
 ## Notes
 
 This tool is based on static pattern matching. Treat findings as review candidates, not final truth. Validate high-impact findings manually before making release decisions.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "AI Security Code Review Agent"
+  short_description: "Scan codebases for security risks"
+  default_prompt: "Use $ai-security-code-review-agent to scan this repository and summarize the highest-risk findings."
+
+policy:
+  allow_implicit_invocation: true
