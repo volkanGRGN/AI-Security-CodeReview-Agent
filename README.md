@@ -109,7 +109,14 @@ Baseline entries can be strings like `A03-005:main.py:12` or objects with `id`, 
 
 The scanner is domain-aware: core, secrets, and code-quality checks always run, while web, mobile, embedded, pipeline, and AI/ML checks run only when the repository has matching signals. Skipped domains are listed in the terminal output and Markdown report.
 
-This repo also includes a GitHub Actions workflow for automatic scans after pushes and pull requests. For multi-agent projects, copy:
+This repo includes two GitHub Actions patterns:
+
+- `.github/workflows/security-agent.yml` scans this scanner repository itself.
+- `templates/security-agent-target-workflow.yml` is copied into another target repository. It checks out the target repo at `target/`, checks out this public scanner repo at `security-agent/`, then runs `security-agent/main.py target`.
+
+The target workflow does not scan the scanner repository. It only downloads the scanner code because GitHub Actions runners do not know about chat-installed skills. Skills are for Codex/Claude chat sessions; workflows are for CI automation after push or pull request events.
+
+For multi-agent projects, copy:
 
 - `templates/CLAUDE_SECURITY_BOUNDARY.md` into `CLAUDE.md`
 - `templates/AGENTS_SECURITY_BOUNDARY.md` into `AGENTS.md`

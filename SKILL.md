@@ -71,6 +71,17 @@ When using this skill in a project with other Claude or Codex agents, add the re
 
 This prevents ordinary implementation agents from spending tokens on duplicate security/KVKK reviews. They should let the security-agent workflow run after push and read the latest report only when the user asks.
 
+## GitHub Actions Usage
+
+For automatic scans after every push or pull request, copy `templates/security-agent-target-workflow.yml` into the target repository as `.github/workflows/ai-security-agent.yml`.
+
+That workflow intentionally checks out two repositories:
+
+- `target/`: the project being scanned
+- `security-agent/`: this public scanner repo, used only as the tool source
+
+This is separate from skill usage. Codex/Claude can read `SKILL.md` during a chat, but GitHub Actions runs on a clean CI machine and must fetch the scanner code explicitly.
+
 ## Claude Usage
 
 This repo also includes `.claude/commands/security-review.md` for Claude Code slash-command usage. Use it when the user explicitly asks for `/security-review` or wants the Claude command workflow.
