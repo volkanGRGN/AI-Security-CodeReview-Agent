@@ -36,6 +36,7 @@ SKIP_DIRS = {
     '.dart_tool', '.pub-cache', 'coverage', 'htmlcov',
     'eggs', '.eggs', 'site-packages', '.tox', 'migrations',
     '.mypy_cache', '.ruff_cache', 'jspm_packages',
+    'fixtures', 'testdata', '.tmp',
 }
 
 BINARY_EXTENSIONS = {
@@ -52,14 +53,16 @@ MAX_LINE_LENGTH = 2000   # skip minified lines
 
 
 class SecurityRunner:
-    def __init__(self, repo_path: Path, project_info: dict):
+    def __init__(self, repo_path: Path, project_info: dict, config: dict | None = None):
         self.repo_path = repo_path
         self.project_info = project_info
+        self.config = config or {}
         self.findings: List[Dict[str, Any]] = []
         self._compiled_patterns = {}
         self._ignore_patterns = self._load_ignore_patterns()
         self.active_domains = project_info.get('security_domains') or ['core', 'secrets', 'code_quality']
         self.active_patterns = self._select_patterns()
+        self.has_tests = self._detect_test_presence()
         self._precompile_patterns()
 
     def _select_patterns(self) -> List[Dict[str, Any]]:
@@ -71,7 +74,7 @@ class SecurityRunner:
     def _load_ignore_patterns(self) -> List[str]:
         ignore_file = self.repo_path / '.securityignore'
         if not ignore_file.exists():
-            return []
+            return list(self.config.get('ignore_patterns') or [])
 
         patterns = []
         try:
@@ -81,6 +84,7 @@ class SecurityRunner:
                     patterns.append(stripped.replace('\\', '/'))
         except (OSError, PermissionError):
             return []
+        patterns.extend(self.config.get('ignore_patterns') or [])
         return patterns
 
     def _precompile_patterns(self):
@@ -119,8 +123,13 @@ class SecurityRunner:
         except (OSError, PermissionError):
             return
 
+        try:
+            rel_parts = filepath.relative_to(self.repo_path).parts
+        except ValueError:
+            rel_parts = filepath.parts
+
         # Skip dirs
-        for part in filepath.parts:
+        for part in rel_parts:
             if part in SKIP_DIRS:
                 return
 
@@ -134,6 +143,9 @@ class SecurityRunner:
         filename = filepath.name
 
         for pattern_def in self.active_patterns:
+            if self._should_skip_pattern(pattern_def, filepath, rel_parts):
+                continue
+
             # Filter by applicable languages
             applicable_langs = pattern_def.get('langs', 'all')
             if applicable_langs != 'all':
@@ -177,6 +189,36 @@ class SecurityRunner:
                             continue  # negative pattern matched, likely handled
 
                     self._add_finding(pattern_def, filepath, lineno, line.strip(), self._get_context(lines, lineno))
+
+    def _detect_test_presence(self) -> bool:
+        for candidate in self.project_info.get('file_list', []):
+            try:
+                rel_path = Path(candidate).relative_to(self.repo_path).as_posix().lower()
+            except ValueError:
+                rel_path = Path(candidate).as_posix().lower()
+            name = Path(rel_path).name
+            if (
+                rel_path.startswith(('tests/', 'test/'))
+                or '/tests/' in rel_path
+                or name.startswith('test_')
+                or name.endswith(('_test.py', '.test.js', '.spec.js', '.test.ts', '.spec.ts'))
+            ):
+                return True
+        return False
+
+    def _should_skip_pattern(self, pattern_def: dict, filepath: Path, rel_parts: tuple) -> bool:
+        if pattern_def.get('id') != 'CQ-050':
+            return False
+        if self.has_tests:
+            return True
+        name = filepath.name.lower()
+        rel_path = '/'.join(rel_parts).lower()
+        return (
+            'tests' in rel_parts
+            or rel_path.startswith(('test/', 'tests/'))
+            or name.startswith('test_')
+            or name.endswith(('_test.py', '.test.js', '.spec.js', '.test.ts', '.spec.ts'))
+        )
 
     def _is_ignored(self, filepath: Path) -> bool:
         try:

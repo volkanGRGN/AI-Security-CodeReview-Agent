@@ -56,6 +56,14 @@ Avoid treating static pattern matches as final truth. Always validate severe fin
 
 The scanner is domain-aware. It always runs core, secrets, and code-quality checks. It only runs web, mobile, embedded, pipeline, or AI/ML rules when the target repository has matching architecture or dependency signals.
 
+Use `.security-agent.yml` when a repository needs custom behavior:
+
+- `fail_threshold` sets the CI gate severity.
+- `include_domains` and `exclude_domains` override auto-detected domains.
+- `ignore_patterns` adds repo-local ignores.
+- `baseline_file` suppresses accepted legacy findings.
+- `dependency_audit.enabled` controls pip-audit, npm audit, and osv-scanner integration.
+
 When using this skill in a project with other Claude or Codex agents, add the relevant boundary snippet:
 
 - `templates/CLAUDE_SECURITY_BOUNDARY.md` into `CLAUDE.md`

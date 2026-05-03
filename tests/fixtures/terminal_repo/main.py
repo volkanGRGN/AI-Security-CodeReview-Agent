@@ -1,0 +1,2 @@
+class TerminalReporter:
+    pass

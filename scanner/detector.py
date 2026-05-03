@@ -115,6 +115,7 @@ SKIP_DIRS = {
     '.env', 'dist', 'build', 'target', '.gradle', '.idea', '.vscode',
     'vendor', 'Pods', '.dart_tool', '.pub-cache', 'coverage',
     'htmlcov', 'eggs', '.eggs', 'site-packages', '.tox',
+    'fixtures', 'testdata', '.tmp',
 }
 
 MAX_FILES_SCAN = 2000

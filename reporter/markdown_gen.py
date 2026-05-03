@@ -99,6 +99,9 @@ class MarkdownReporter:
         arch = ', '.join(f"`{a}`" for a in info['arch_types'])
         domains = ', '.join(f"`{d}`" for d in info.get('security_domains', [])) or 'None'
         skipped = ', '.join(f"`{d}`" for d in info.get('skipped_domains', [])) or 'None'
+        config = info.get('security_config') or {}
+        config_path = config.get('config_path') or 'Default config'
+        fail_threshold = config.get('fail_threshold', 'CRITICAL')
 
         return f"""## Project Overview
 
@@ -111,7 +114,9 @@ class MarkdownReporter:
 | **Frameworks** | {frameworks} |
 | **Architecture Types** | {arch} |
 | **Active Scan Domains** | {domains} |
-| **Skipped Domains** | {skipped} |"""
+| **Skipped Domains** | {skipped} |
+| **Config** | {config_path} |
+| **Fail Threshold** | `{fail_threshold}` |"""
 
     def _severity_breakdown(self) -> str:
         by_category = defaultdict(lambda: defaultdict(int))

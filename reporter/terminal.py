@@ -51,6 +51,10 @@ class TerminalReporter:
         skipped = info.get('skipped_domains', [])
         if skipped:
             print(f"  {Fore.WHITE + Style.BRIGHT}Skipped:      {Style.RESET_ALL}{', '.join(skipped)}")
+        config = info.get('security_config') or {}
+        if config.get('config_path'):
+            print(f"  {Fore.WHITE + Style.BRIGHT}Config:       {Style.RESET_ALL}{config.get('config_path')}")
+        print(f"  {Fore.WHITE + Style.BRIGHT}Fail Gate:    {Style.RESET_ALL}{config.get('fail_threshold', 'CRITICAL')}")
 
     def print_findings_summary(self, findings: list):
         counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0}

@@ -13,7 +13,9 @@ import json
 import argparse
 from pathlib import Path
 
+from scanner.config import apply_config_to_project, finding_key, load_baseline, load_config
 from scanner.detector import ProjectDetector
+from scanner.dependency_audit import run_dependency_audits
 from scanner.runner import SecurityRunner
 from reporter.terminal import TerminalReporter
 from reporter.markdown_gen import MarkdownReporter
@@ -38,6 +40,7 @@ Examples:
     parser.add_argument('--severity', '-s', default='LOW',
                         choices=['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'],
                         help='Minimum severity to show (default: LOW)')
+    parser.add_argument('--config', help='Path to .security-agent.yml/json config')
     return parser.parse_args()
 
 
@@ -101,17 +104,31 @@ def main():
         terminal.print_error(f"Path does not exist: {repo_path}")
         sys.exit(1)
 
+    config = load_config(repo_path, args.config)
+
     # ─── PHASE 1: Architecture Detection ───────────────────────────
     terminal.print_phase("PHASE 1 — Architecture & Technology Detection")
     detector = ProjectDetector(repo_path)
     project_info = detector.detect()
+    project_info = apply_config_to_project(project_info, config)
     terminal.print_project_info(project_info)
 
     # ─── PHASE 2: Security Scan ─────────────────────────────────────
     terminal.print_phase("PHASE 2 — Security Analysis & Code Review")
     terminal.print_info(f"Scanning {project_info['total_files']} files...")
-    runner = SecurityRunner(repo_path, project_info)
+    runner = SecurityRunner(repo_path, project_info, config)
     findings = runner.run_all_checks()
+
+    dependency_findings = run_dependency_audits(repo_path, config)
+    if dependency_findings:
+        terminal.print_info(f"Dependency audit added {len(dependency_findings)} finding(s).")
+        findings.extend(dependency_findings)
+
+    baseline = load_baseline(repo_path, config.get('baseline_file'))
+    if baseline:
+        before = len(findings)
+        findings = [finding for finding in findings if finding_key(finding) not in baseline]
+        terminal.print_info(f"Baseline suppressed {before - len(findings)} accepted finding(s).")
 
     # Filter by minimum severity
     sev_order = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
@@ -135,6 +152,7 @@ def main():
     with open(findings_json, 'w', encoding='utf-8') as f:
         json.dump({
             'project_info': {k: v for k, v in project_info.items() if k != 'file_list'},
+            'config': {k: v for k, v in config.items() if k != 'ignore_patterns'},
             'findings': findings,
             'total': len(findings),
             'by_severity': {

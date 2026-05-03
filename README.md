@@ -60,10 +60,50 @@ Filter by minimum severity:
 python main.py /path/to/repo --severity HIGH
 ```
 
+Use a repo-specific config:
+
+```bash
+python main.py /path/to/repo --config /path/to/repo/.security-agent.yml
+```
+
+Run tests:
+
+```bash
+python -m unittest discover -s tests
+```
+
 ## Outputs
 
 - `security_report.md`: human-readable Markdown report
 - `.security_findings.json`: structured findings for follow-up analysis and Claude Code workflows
+
+## Configuration
+
+Create `.security-agent.yml` in a target repo:
+
+```yaml
+fail_threshold: CRITICAL
+include_domains: []
+exclude_domains: []
+ignore_patterns:
+  - generated/
+  - security_report*.md
+baseline_file: .security_baseline.json
+dependency_audit:
+  enabled: true
+  tools: [pip-audit, npm-audit, osv-scanner]
+```
+
+Supported controls:
+
+- `fail_threshold`: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, or `INFO`
+- `include_domains`: force-enable domains such as `web`, `mobile`, `embedded`, `pipeline`, `ai_ml`
+- `exclude_domains`: force-disable noisy or irrelevant domains
+- `ignore_patterns`: repo-specific scan ignores, combined with `.securityignore`
+- `baseline_file`: accepted legacy findings to suppress
+- `dependency_audit`: optional `pip-audit`, `npm audit`, and `osv-scanner` integration
+
+Baseline entries can be strings like `A03-005:main.py:12` or objects with `id`, `file`, and `line`.
 
 ## Automation and Agent Boundaries
 

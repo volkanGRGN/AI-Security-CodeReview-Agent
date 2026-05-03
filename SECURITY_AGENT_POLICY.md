@@ -41,6 +41,18 @@ The scanner detects active security domains before applying rules. Core, secrets
 
 This keeps reports focused and prevents other agents from spending tokens on security areas that do not exist in the target project.
 
+## Config, Baseline, and Dependency Audit
+
+Repositories may define `.security-agent.yml` or `.security-agent.json` to control:
+
+- fail threshold
+- forced included/excluded domains
+- additional ignore patterns
+- baseline file for accepted legacy findings
+- dependency audit tools
+
+Dependency audit is optional and uses installed tools when available: `pip-audit`, `npm audit`, and `osv-scanner`. Missing tools do not fail the scan; they are reported as INFO findings when included by the severity filter.
+
 ## Project Instruction Snippets
 
 Copy `templates/CLAUDE_SECURITY_BOUNDARY.md` into a target repository's `CLAUDE.md` so Claude agents know not to duplicate security work.

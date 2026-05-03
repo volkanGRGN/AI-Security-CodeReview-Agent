@@ -1,0 +1,13 @@
+fail_threshold: CRITICAL
+include_domains: []
+exclude_domains: []
+ignore_patterns:
+  - scanner/patterns/
+  - tests/fixtures/
+  - tests/.tmp/
+  - security_report*.md
+  - .security_findings.json
+baseline_file: .security_baseline.json
+dependency_audit:
+  enabled: true
+  tools: [pip-audit, npm-audit, osv-scanner]
