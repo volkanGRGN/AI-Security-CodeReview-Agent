@@ -5,6 +5,7 @@ Walks the codebase, applies all pattern checks, returns structured findings.
 
 import re
 import os
+import fnmatch
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -17,16 +18,16 @@ from scanner.patterns.pipeline import PIPELINE_PATTERNS
 from scanner.patterns.ai_ml import AI_ML_PATTERNS
 from scanner.patterns.code_quality import CODE_QUALITY_PATTERNS
 
-ALL_PATTERNS = (
-    OWASP_PATTERNS
-    + SECRETS_PATTERNS
-    + WEB_PATTERNS
-    + MOBILE_PATTERNS
-    + EMBEDDED_PATTERNS
-    + PIPELINE_PATTERNS
-    + AI_ML_PATTERNS
-    + CODE_QUALITY_PATTERNS
-)
+PATTERN_GROUPS = {
+    'core': OWASP_PATTERNS,
+    'secrets': SECRETS_PATTERNS,
+    'web': WEB_PATTERNS,
+    'mobile': MOBILE_PATTERNS,
+    'embedded': EMBEDDED_PATTERNS,
+    'pipeline': PIPELINE_PATTERNS,
+    'ai_ml': AI_ML_PATTERNS,
+    'code_quality': CODE_QUALITY_PATTERNS,
+}
 
 SKIP_DIRS = {
     'node_modules', '.git', '__pycache__', '.pytest_cache',
@@ -56,10 +57,34 @@ class SecurityRunner:
         self.project_info = project_info
         self.findings: List[Dict[str, Any]] = []
         self._compiled_patterns = {}
+        self._ignore_patterns = self._load_ignore_patterns()
+        self.active_domains = project_info.get('security_domains') or ['core', 'secrets', 'code_quality']
+        self.active_patterns = self._select_patterns()
         self._precompile_patterns()
 
+    def _select_patterns(self) -> List[Dict[str, Any]]:
+        patterns = []
+        for domain in self.active_domains:
+            patterns.extend(PATTERN_GROUPS.get(domain, []))
+        return patterns
+
+    def _load_ignore_patterns(self) -> List[str]:
+        ignore_file = self.repo_path / '.securityignore'
+        if not ignore_file.exists():
+            return []
+
+        patterns = []
+        try:
+            for line in ignore_file.read_text(encoding='utf-8', errors='ignore').splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#'):
+                    patterns.append(stripped.replace('\\', '/'))
+        except (OSError, PermissionError):
+            return []
+        return patterns
+
     def _precompile_patterns(self):
-        for pattern_def in ALL_PATTERNS:
+        for pattern_def in self.active_patterns:
             pid = pattern_def['id']
             try:
                 self._compiled_patterns[pid] = {
@@ -79,6 +104,9 @@ class SecurityRunner:
         return self._deduplicate(self.findings)
 
     def _scan_file(self, filepath: Path):
+        if self._is_ignored(filepath):
+            return
+
         # Skip binary files
         if filepath.suffix.lower() in BINARY_EXTENSIONS:
             return
@@ -105,7 +133,7 @@ class SecurityRunner:
         ext = filepath.suffix.lower()
         filename = filepath.name
 
-        for pattern_def in ALL_PATTERNS:
+        for pattern_def in self.active_patterns:
             # Filter by applicable languages
             applicable_langs = pattern_def.get('langs', 'all')
             if applicable_langs != 'all':
@@ -149,6 +177,24 @@ class SecurityRunner:
                             continue  # negative pattern matched, likely handled
 
                     self._add_finding(pattern_def, filepath, lineno, line.strip(), self._get_context(lines, lineno))
+
+    def _is_ignored(self, filepath: Path) -> bool:
+        try:
+            rel_path = filepath.relative_to(self.repo_path).as_posix()
+        except ValueError:
+            rel_path = filepath.as_posix()
+
+        for pattern in self._ignore_patterns:
+            normalized = pattern.lstrip('/')
+            if normalized.endswith('/'):
+                if rel_path.startswith(normalized):
+                    return True
+                continue
+            if fnmatch.fnmatch(rel_path, normalized):
+                return True
+            if fnmatch.fnmatch(rel_path, f'{normalized}/**'):
+                return True
+        return False
 
     def _get_context(self, lines: list, lineno: int, context: int = 3) -> str:
         start = max(0, lineno - context - 1)

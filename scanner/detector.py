@@ -118,6 +118,8 @@ SKIP_DIRS = {
 }
 
 MAX_FILES_SCAN = 2000
+CORE_SECURITY_DOMAINS = ['core', 'secrets', 'code_quality']
+OPTIONAL_SECURITY_DOMAINS = ['web', 'mobile', 'embedded', 'pipeline', 'ai_ml']
 
 
 class ProjectDetector:
@@ -127,12 +129,15 @@ class ProjectDetector:
         self.detected_frameworks = []
         self.lang_counts = Counter()
         self.arch_types = []
+        self.security_domains = []
+        self.skipped_domains = []
 
     def detect(self) -> dict:
         self._walk()
         self._detect_languages()
         self._detect_frameworks()
         self._detect_architecture()
+        self._detect_security_domains()
         return {
             'path': str(self.repo_path),
             'name': self.repo_path.name,
@@ -140,6 +145,8 @@ class ProjectDetector:
             'primary_language': self.lang_counts.most_common(1)[0][0] if self.lang_counts else 'Unknown',
             'frameworks': self.detected_frameworks,
             'arch_types': self.arch_types,
+            'security_domains': self.security_domains,
+            'skipped_domains': self.skipped_domains,
             'total_files': len(self.all_files),
             'file_list': self.all_files,
         }
@@ -147,7 +154,10 @@ class ProjectDetector:
     def _walk(self):
         count = 0
         for root, dirs, files in os.walk(self.repo_path):
-            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith('.')]
+            dirs[:] = [
+                d for d in dirs
+                if d not in SKIP_DIRS and (not d.startswith('.') or d in {'.github', '.gitlab'})
+            ]
             for f in files:
                 if count >= MAX_FILES_SCAN:
                     break
@@ -186,11 +196,21 @@ class ProjectDetector:
 
     def _detect_architecture(self):
         all_names = {f.name for f in self.all_files}
-        all_paths_str = ' '.join(str(f).lower() for f in self.all_files)
+        all_names_lower = {f.name.lower() for f in self.all_files}
+        all_suffixes = {f.suffix.lower() for f in self.all_files}
+        rel_paths = [f.relative_to(self.repo_path).as_posix().lower() for f in self.all_files]
+        all_paths_str = ' '.join(rel_paths)
 
         for arch, signals in ARCH_SIGNALS.items():
             for signal in signals:
-                if signal in all_names or signal.lower() in all_paths_str:
+                signal_lower = signal.lower()
+                is_extension = signal_lower.startswith('.') and '/' not in signal_lower
+                if (
+                    signal in all_names
+                    or signal_lower in all_names_lower
+                    or (is_extension and signal_lower in all_suffixes)
+                    or (not is_extension and signal_lower in all_paths_str)
+                ):
                     if arch not in self.arch_types:
                         self.arch_types.append(arch)
                     break
@@ -207,6 +227,61 @@ class ProjectDetector:
                     self.arch_types.append('wearable')
                 break
 
-        # If nothing detected, default to 'web'
         if not self.arch_types:
-            self.arch_types = ['web']
+            self.arch_types = ['cli']
+
+    def _detect_security_domains(self):
+        names = {f.name.lower() for f in self.all_files}
+        rel_paths = [f.relative_to(self.repo_path).as_posix().lower() for f in self.all_files]
+        frameworks = {f.lower() for f in self.detected_frameworks}
+        arch = set(self.arch_types)
+
+        active = set(CORE_SECURITY_DOMAINS)
+
+        web_signals = {
+            'django', 'flask/fastapi', 'django/flask/wsgi', 'django/asgi',
+            'next.js', 'nuxt.js', 'angular', 'vue.js', 'svelte', 'remix',
+            'astro', 'ruby/rails', 'php/composer'
+        }
+        if (
+            'web' in arch
+            or bool(frameworks & web_signals)
+            or any(name in names for name in {'app.py', 'manage.py', 'wsgi.py', 'asgi.py'})
+            or any(path.startswith(('pages/', 'app/', 'public/', 'src/pages/')) for path in rel_paths)
+        ):
+            active.add('web')
+
+        if arch & {'android', 'ios', 'flutter', 'wearable'}:
+            active.add('mobile')
+
+        if 'embedded' in arch:
+            active.add('embedded')
+
+        if (
+            'devops' in arch
+            or any(path.startswith(('.github/workflows/', '.gitlab-ci')) for path in rel_paths)
+            or any(name in names for name in {'dockerfile', 'docker-compose.yml', 'docker-compose.yaml', 'jenkinsfile', 'main.tf'})
+            or any('terraform' in path or '/k8s/' in path or 'kubernetes' in path for path in rel_paths)
+        ):
+            active.add('pipeline')
+
+        ai_ml_files = {'model.py', 'train.py', 'inference.py', 'mlflow.yaml', 'environment.yml'}
+        ai_ml_packages = {'langchain', 'openai', 'anthropic', 'transformers', 'torch', 'tensorflow', 'mlflow'}
+        if 'ai_ml' in arch or bool(names & ai_ml_files) or self._requirements_contain(ai_ml_packages):
+            active.add('ai_ml')
+
+        self.security_domains = [domain for domain in CORE_SECURITY_DOMAINS + OPTIONAL_SECURITY_DOMAINS if domain in active]
+        self.skipped_domains = [domain for domain in OPTIONAL_SECURITY_DOMAINS if domain not in active]
+
+    def _requirements_contain(self, packages: set) -> bool:
+        for filename in ('requirements.txt', 'pyproject.toml', 'package.json'):
+            candidate = self.repo_path / filename
+            if not candidate.exists():
+                continue
+            try:
+                content = candidate.read_text(encoding='utf-8', errors='ignore').lower()
+            except (OSError, PermissionError):
+                continue
+            if any(package in content for package in packages):
+                return True
+        return False

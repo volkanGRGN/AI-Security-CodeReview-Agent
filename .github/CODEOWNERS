@@ -1,0 +1,10 @@
+# Security-agent ownership boundary.
+# Keep scanner rules, skill instructions, and CI gate changes under explicit review.
+
+/scanner/ @volkanGRGN
+/reporter/ @volkanGRGN
+/main.py @volkanGRGN
+/SKILL.md @volkanGRGN
+/agents/ @volkanGRGN
+/.claude/commands/security-review.md @volkanGRGN
+/.github/workflows/security-agent.yml @volkanGRGN

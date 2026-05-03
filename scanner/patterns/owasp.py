@@ -115,7 +115,7 @@ OWASP_PATTERNS = [
         'category': 'A02: Cryptographic Failures',
         'name': 'Weak Encryption - DES/RC4/ECB',
         'severity': 'CRITICAL',
-        'pattern': r'\b(DES|RC4|RC2|Blowfish|AES\.MODE_ECB|Cipher\.getInstance\(["\']AES/ECB)',
+        'pattern': r'(["\']DES["\']|["\']RC4["\']|["\']RC2["\']|["\']Blowfish["\']|AES\.MODE_ECB|Cipher\.getInstance\(["\']AES/ECB)',
         'description': 'Weak or broken encryption algorithm in use. ECB mode is not semantically secure.',
         'fix': 'Use AES-256 in GCM mode. Never use ECB mode. RC4/DES are completely broken.',
         'langs': ['.py', '.java', '.js', '.ts', '.c', '.cpp', '.go', '.rb'],

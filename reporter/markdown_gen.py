@@ -97,6 +97,8 @@ class MarkdownReporter:
         langs = ', '.join(f"`{k}` ({v} files)" for k, v in list(info['languages'].items())[:6])
         frameworks = ', '.join(f"`{f}`" for f in info['frameworks'][:8]) or 'None detected'
         arch = ', '.join(f"`{a}`" for a in info['arch_types'])
+        domains = ', '.join(f"`{d}`" for d in info.get('security_domains', [])) or 'None'
+        skipped = ', '.join(f"`{d}`" for d in info.get('skipped_domains', [])) or 'None'
 
         return f"""## Project Overview
 
@@ -107,7 +109,9 @@ class MarkdownReporter:
 | **Primary Language** | `{info['primary_language']}` |
 | **Languages** | {langs} |
 | **Frameworks** | {frameworks} |
-| **Architecture Types** | {arch} |"""
+| **Architecture Types** | {arch} |
+| **Active Scan Domains** | {domains} |
+| **Skipped Domains** | {skipped} |"""
 
     def _severity_breakdown(self) -> str:
         by_category = defaultdict(lambda: defaultdict(int))

@@ -65,6 +65,17 @@ python main.py /path/to/repo --severity HIGH
 - `security_report.md`: human-readable Markdown report
 - `.security_findings.json`: structured findings for follow-up analysis and Claude Code workflows
 
+## Automation and Agent Boundaries
+
+The scanner is domain-aware: core, secrets, and code-quality checks always run, while web, mobile, embedded, pipeline, and AI/ML checks run only when the repository has matching signals. Skipped domains are listed in the terminal output and Markdown report.
+
+This repo also includes a GitHub Actions workflow for automatic scans after pushes and pull requests. For multi-agent projects, copy:
+
+- `templates/CLAUDE_SECURITY_BOUNDARY.md` into `CLAUDE.md`
+- `templates/AGENTS_SECURITY_BOUNDARY.md` into `AGENTS.md`
+
+Those snippets tell non-security agents not to waste tokens on broad security/KVKK reviews unless explicitly asked.
+
 ## Claude Command
 
 The project includes `.claude/commands/security-review.md`, a slash-command workflow for turning scanner results into a deeper security review with exploitability analysis, false-positive triage, and prioritized remediation.

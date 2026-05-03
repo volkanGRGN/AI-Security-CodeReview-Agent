@@ -1,0 +1,5 @@
+# Ignore generated outputs and scanner rule catalogs when the tool scans itself.
+.security_findings.json
+security_report*.md
+security_summary.md
+scanner/patterns/

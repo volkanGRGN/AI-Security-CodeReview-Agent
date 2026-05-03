@@ -74,7 +74,7 @@ AI_ML_PATTERNS = [
         'category': 'AI/ML: LLM Security',
         'name': 'Insecure LangChain Tool Usage',
         'severity': 'HIGH',
-        'pattern': r'(ShellTool|PythonREPLTool|BashProcess|Terminal)',
+        'pattern': r'\b(ShellTool|PythonREPLTool|BashProcess)\b|from\s+langchain.*Terminal',
         'description': 'LangChain shell/REPL tool gives LLM arbitrary code execution capability.',
         'fix': 'Never use shell/REPL tools in production. Use sandboxed execution environments.',
         'langs': ['.py'],

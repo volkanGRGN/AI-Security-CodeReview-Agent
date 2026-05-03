@@ -52,6 +52,17 @@ When summarizing results, lead with:
 
 Avoid treating static pattern matches as final truth. Always validate severe findings against the actual code context.
 
+## Domain and Token Discipline
+
+The scanner is domain-aware. It always runs core, secrets, and code-quality checks. It only runs web, mobile, embedded, pipeline, or AI/ML rules when the target repository has matching architecture or dependency signals.
+
+When using this skill in a project with other Claude or Codex agents, add the relevant boundary snippet:
+
+- `templates/CLAUDE_SECURITY_BOUNDARY.md` into `CLAUDE.md`
+- `templates/AGENTS_SECURITY_BOUNDARY.md` into `AGENTS.md`
+
+This prevents ordinary implementation agents from spending tokens on duplicate security/KVKK reviews. They should let the security-agent workflow run after push and read the latest report only when the user asks.
+
 ## Claude Usage
 
 This repo also includes `.claude/commands/security-review.md` for Claude Code slash-command usage. Use it when the user explicitly asks for `/security-review` or wants the Claude command workflow.

@@ -1,0 +1,102 @@
+name: Security Agent Scan
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  security-scan:
+    name: Run security agent
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run scanner
+        run: python main.py . --no-interactive --severity LOW --output security_report.md
+
+      - name: Write job summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          findings_path = Path(".security_findings.json")
+          summary_path = Path("security_summary.md")
+
+          if not findings_path.exists():
+              summary = "## Security Agent Scan\n\nNo scanner JSON output was produced.\n"
+          else:
+              data = json.loads(findings_path.read_text(encoding="utf-8"))
+              counts = data.get("by_severity", {})
+              total = data.get("total", 0)
+              findings = data.get("findings", [])
+              top = sorted(
+                  findings,
+                  key=lambda f: {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}.get(f.get("severity"), 5),
+              )[:20]
+
+              lines = [
+                  "## Security Agent Scan",
+                  "",
+                  f"Total findings: **{total}**",
+                  "",
+                  "| Severity | Count |",
+                  "|---|---:|",
+              ]
+              for severity in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]:
+                  lines.append(f"| {severity} | {counts.get(severity, 0)} |")
+
+              if top:
+                  lines.extend(["", "### Top Findings", "", "| Severity | Finding | Location |", "|---|---|---|"])
+                  for finding in top:
+                      location = f"{finding.get('file')}:{finding.get('line')}"
+                      lines.append(f"| {finding.get('severity')} | {finding.get('name')} | `{location}` |")
+
+              summary = "\n".join(lines) + "\n"
+
+          summary_path.write_text(summary, encoding="utf-8")
+          Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).write_text(summary, encoding="utf-8")
+          PY
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-agent-report
+          path: |
+            security_report.md
+            .security_findings.json
+            security_summary.md
+          if-no-files-found: ignore
+
+      - name: Fail on critical findings
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path(".security_findings.json").read_text(encoding="utf-8"))
+          critical = data.get("by_severity", {}).get("CRITICAL", 0)
+          if critical:
+              raise SystemExit(f"Security gate failed: {critical} CRITICAL finding(s).")
+          PY
